@@ -62,6 +62,8 @@
 - import_playbook: ocp-cli-plugins.yml
   when: enable_cli_plugins_test is defined and enable_cli_plugins_test
 
+- import_playbook: ocp-sso.yml
+  when: sso_enabled is defined and sso_enabled
 
 - import_playbook: ocp-compliance.yml
   when: compliance_enabled is defined and compliance_enabled
@@ -123,6 +125,21 @@
   when: >
         (hypershift_agent_install is defined and hypershift_agent_install) or
         (hypershift_agent_destroy is defined and hypershift_agent_destroy)
+  
+- import_playbook: ocp-lso.yml
+  when: lso_enabled is defined and lso_enabled
+
+- import_playbook: ocp-operator-api.yml
+  when: op_api_role_enable is defined and op_api_role_enable
+
+- import_playbook: ocp-cluster-etcd-operator.yml
+  when: cluster_etcd_enabled is defined and cluster_etcd_enabled
+
+- import_playbook: ocp-kube-burner.yml
+  when: enable_kube_burner is defined and enable_kube_burner
+  
+- import_playbook: scheduler-plugins.yml
+  when: ocp_scheduler_plugins_enable is defined and ocp_scheduler_plugins_enable  
 
 - import_playbook: ocp-odf-operator.yml
   when: odf_enabled is defined and odf_enabled

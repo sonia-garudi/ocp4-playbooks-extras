@@ -300,6 +300,20 @@ fio_git_token: ""
 fio_git_branch: ""
 fio_cleanup: true
 
+# ocp-sso vars
+sso_enabled: false
+sso_directory: "/tmp/sso"
+sso_catalogsource_image: ""        # "brew.registry.redhat.io/rh-osbs/iib:327237"
+sso_upgrade_channel: "stable"
+sso_schedulerImage: "registry.k8s.io/scheduler-plugins/kube-scheduler:v0.30.6"
+sso_go_tarball: "https://go.dev/dl/go1.22.4.linux-ppc64le.tar.gz"
+sso_e2e: false
+sso_e2e_github_repo: "https://github.com/openshift/openshift-tests-private.git"
+sso_e2e_github_branch: "master"
+sso_github_username: ""
+sso_github_token: ""
+sso_cleanup: true
+
 #ocp-verification-tests vars
 verification_enabled: false
 verification_dir: "/root/verification-tests"
@@ -423,6 +437,49 @@ db_volume_size: "10Gi"
 fs_volume_size: "100Gi"
 iso_url: ""
 root_fs_url: ""
+
+# ocp-lso vars
+lso_enabled: false            #set to true for lso operator installation
+lso_catalogsource_image: ""   #registry.redhat.io/redhat/redhat-operator-index:vX.y-prerelease-local-storage-operator
+lso_namespace: ""             #openshift-local-storage
+lso_channel: ""               #stable,alpha,beta
+lso_catalogsource_name: ""       #my-operator-catalog
+device_path: "" 
+
+# ocp-operator-api vars
+op_api_role_enable: false
+helm_op: false
+ansible_op: false
+go_op: false
+op_cleanup: false
+operator_sdk_version: "1.38.0"
+op_api_dir: "/tmp/operator-api"
+helm_op_image: "quay.io/{{quay_username}}/nginx-operator-helm:v1"
+ansible_op_image: "quay.io/{{quay_username}}/memcached-operator-ansible:v1"
+go_op_image: "quay.io/{{quay_username}}/memcached-operator-go:v1"
+
+# ocp-cluster-etcd-operator vars
+cluster_etcd_enabled: false
+etcd_namespace: "openshift-etcd"
+install_acme_air: false
+run_e2e: false
+install_kube_burner: false
+
+# ocp-kubr-burner vars
+enable_kube_burner: false
+kube_burner_repo: "https://github.com/kube-burner/kube-burner.git"
+kube_burner_dir: "/root/kube-burner"
+kube_burner_path: "/root/kube-burner/examples/workloads"
+kube_burner_version: "1.10.4"
+
+#scheduler-plugin vars:
+ocp_scheduler_plugins_enable: false     #set true to enable
+kubeconfig_path: "/root/openstack-upi/auth/kubeconfig"  # Path to the kubeconfig file for accessing the cluster
+scheduler_plugins_repo: "https://github.com/kubernetes-sigs/scheduler-plugins.git"  # Repo URL for scheduler plugins
+scheduler_plugins_chart_dir: "/root/scheduler-plugins/manifests/install/charts"  # Path to the Helm chart for scheduler plugins
+scheduler_image: "registry.k8s.io/scheduler-plugins/kube-scheduler:v0.30.6"  # Image for the scheduler plugin
+nginx_image: "quay.io/powercloud/nginx-unprivileged:latest"  # Image for nginx deployment
+pause_image: "registry.k8s.io/pause:3.6"  # Image for the pause container
 
 # ocp-odf-operator required vars
 odf_enabled: false
