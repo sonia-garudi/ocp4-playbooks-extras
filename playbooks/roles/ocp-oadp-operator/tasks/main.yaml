@@ -1,0 +1,236 @@
+---
+# tasks file for playbooks/roles/ocp-oadp-operator
+
+# Check the health of Cluster Operators
+- name: Check if cluster operators and nodes are healthy
+  include_role:
+    name: check-cluster-health
+
+- name: Validate required variables
+  assert:
+    that:
+      - private_github_username is defined
+      - private_github_apikey is defined
+    fail_msg: "github_user and github_api_key must be provided for cloning mirrored repos. See README.md."
+
+- name: Validate AWS credential variables
+  assert:
+    that:
+      - aws_access_key_id is defined and aws_access_key_id != ''
+      - aws_secret_access_key is defined and aws_secret_access_key != ''
+    fail_msg: "aws_access_key_id and aws_secret_access_key must be set for e2e tests"
+  when: oadp_run_e2e == true
+
+# ── LSO ──────────────────────────────────────────────────────────────────────
+
+- name: Check if LSO (Local Storage Operator) is already installed
+  shell: |
+    oc get csv -n openshift-local-storage -o json | jq -r '.items[] | select(.metadata.name | test("local-storage-operator")) | .status.phase'
+  register: lso_csv_status
+  changed_when: false
+  failed_when: false
+
+- name: Set flag if LSO installation is required
+  set_fact:
+    lso_install_req: "{{ lso_csv_status.stdout != 'Succeeded' }}"
+
+- name: Install LSO - Local Storage Operator
+  include_role:
+    name: ocp-lso
+  when: lso_install_req
+  vars:
+    lso_enabled: true
+    lso_catalogsource_image: "{{ lso_index }}"
+    upi_cluster: "{{ cluster_upi }}"
+    device_path: "{{ volume_path }}"
+    lso_namespace: "openshift-local-storage"
+    lso_channel: "stable"
+    lso_catalogsource_name: "redhat-operators"
+    busybox_image: "quay.io/powercloud/busybox:ubi"
+    lso_enable_global_secret: false
+
+# ── ODF ──────────────────────────────────────────────────────────────────────
+
+- name: Check if ODF (OpenShift Data Foundation) is already installed
+  shell: |
+    oc get csv -n openshift-storage -o json | jq -r '.items[] | select(.metadata.name | test("odf-operator")) | .status.phase'
+  register: odf_csv_status
+  changed_when: false
+  failed_when: false
+
+- name: Set flag if ODF installation is required
+  set_fact:
+    odf_install_req: "{{ odf_csv_status.stdout != 'Succeeded' }}"
+
+- name: Install ODF - OpenShift Data Foundation
+  include_role:
+    name: ocp-odf-operator
+  when: odf_install_req
+  vars:
+    odf_catalogsource_image: "{{ odf_index }}"
+    update_channel: "{{ odf_channel }}"
+    test_pod_image: "quay.io/powercloud/nginx-unprivileged:latest"
+    odf_enable_global_secret: false
+
+# ── OADP ─────────────────────────────────────────────────────────────────────
+
+- name: Create clone destination directory
+  file:
+    path: "{{ clone_dest }}"
+    state: directory
+    mode: '0755'
+
+- name: Clone or update private GitHub repository
+  git:
+    repo: "https://{{ private_github_username }}:{{ private_github_apikey }}@github.ibm.com/{{ private_github_username }}/oadp-qe-automation"
+    dest: "{{ clone_dest }}/oadp-qe-automation"
+    version: "{{ oadp_qe_automation_branch }}"
+    update: yes
+    force: yes
+
+- name: Check if OADP Operator is installed
+  shell: oc get csv -n {{ oadp_namespace }} | grep 'oadp-operator.*Succeeded' | wc -l
+  register: oadp_csv
+
+- name: Install OADP block
+  block:
+  - name: Run OADP install script
+    shell: |
+      set -o pipefail && \
+      bash operator/oadp/deploy_oadp.sh 2>&1 | tee {{ ansible_env.HOME }}/oadp-install.log
+    async: 1800
+    poll: 10
+    register: oadp_install
+    args:
+      chdir: "{{ clone_dest }}/oadp-qe-automation"
+      executable: /bin/bash
+    environment:
+      REPOSITORY: "{{ install_repository_type }}"
+      IP_APPROVAL: "{{ install_ip_approval }}"
+      STREAM: "{{ install_stream }}"
+      OADP_VERSION: "{{ install_oadp_version }}"
+
+  - name: Install OADP script failed
+    fail:
+      msg: "Failed to install OADP operator. Please check {{ ansible_env.HOME }}/oadp-install.log to view the failures"
+    when: oadp_install.rc != 0
+  when: oadp_csv.stdout|int < 1
+
+- name: Verify OADP ClusterServiceVersion
+  shell: oc get csv -n {{ oadp_namespace }} | grep 'oadp-operator.*Succeeded' | wc -l
+  register: csv
+  until: csv.stdout|int == 1
+  retries: 10
+  delay: 120
+
+- name: Clone oadp-e2e-qe repository
+  git:
+    repo: "https://{{ private_github_username }}:{{ private_github_apikey }}@github.ibm.com/{{ private_github_username }}/oadp-e2e-qe"
+    dest: "{{ clone_dest }}/oadp-e2e-qe"
+    version: "{{ oadp_e2e_qe_branch }}"
+    update: yes
+    force: yes
+
+- name: Clone oadp-apps-deployer repository
+  git:
+    repo: "https://{{ private_github_username }}:{{ private_github_apikey }}@github.ibm.com/{{ private_github_username }}/oadp-apps-deployer"
+    dest: "{{ clone_dest }}/oadp-apps-deployer"
+    version: "{{ oadp_apps_deployer_branch }}"
+    update: yes
+    force: yes
+
+# ── Detect Go and Ginkgo versions from go.mod ────────────────────────────────
+
+- name: Read Go version from go.mod
+  shell: grep '^go ' go.mod | awk '{print $2}'
+  register: go_version_raw
+  changed_when: false
+  args:
+    chdir: "{{ clone_dest }}/oadp-e2e-qe"
+    executable: /bin/bash
+
+- name: Read Ginkgo version from go.mod
+  shell: grep 'github.com/onsi/ginkgo/v2' go.mod | awk '{print $2}'
+  register: ginkgo_version_raw
+  changed_when: false
+  args:
+    chdir: "{{ clone_dest }}/oadp-e2e-qe"
+    executable: /bin/bash
+
+- name: Set Go and Ginkgo version facts
+  set_fact:
+    go_version_detected: "{{ go_version_raw.stdout | trim }}"
+    ginkgo_version_detected: "{{ ginkgo_version | default(ginkgo_version_raw.stdout | trim, true) }}"
+
+- name: "Install Go {{ go_version_detected }} for e2e"
+  include_role:
+    name: golang-installation
+  vars:
+    golang_tarball_url: "{{ oadp_golang_tarball_url | default('https://golang.org/dl/go' + go_version_detected + '.linux-ppc64le.tar.gz', true) }}"
+    golang_installation_path: "/usr/local"
+
+- name: Setup e2e repo
+  shell: |
+    cp -R oadp-apps-deployer/src/ocpdeployer oadp-e2e-qe/sample-applications
+  args:
+    chdir: "{{ clone_dest }}"
+    executable: /bin/bash
+
+# ── e2e tests ────────────────────────────────────────────────────────────────
+
+- name: Run e2e block
+  block:
+    - name: Unset any existing default storageclass
+      shell: |
+        for sc in $(oc get sc -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}'); do
+          oc patch sc "$sc" -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+        done
+      changed_when: false
+
+    - name: Set ocs-storagecluster-cephfs as default storageclass
+      shell: |
+        oc patch sc ocs-storagecluster-cephfs \
+        -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+    - name: Create AWS credentials file
+      copy:
+        dest: "{{ aws_creds_file }}"
+        mode: '0600'
+        content: |
+          [default]
+          aws_access_key_id={{ aws_access_key_id }}
+          aws_secret_access_key={{ aws_secret_access_key }}
+
+    - name: Test dry-run
+      shell: |
+        set -o pipefail
+        go install github.com/onsi/ginkgo/v2/ginkgo@{{ ginkgo_version_detected }}
+        go install github.com/onsi/gomega/...
+        EXTRA_GINKGO_PARAMS="--focus=Tier1 --skip=vsl --skip=VSL --dry-run" \
+        /bin/bash test_settings/scripts/test_runner.sh 2>&1 | tee /root/dryrun.txt
+      args:
+        chdir: "{{ clone_dest }}/oadp-e2e-qe"
+        executable: /bin/bash
+
+    - name: Run Tier1 tests (Jenkins, long running)
+      shell: |
+        set -o pipefail
+        EXTRA_GINKGO_PARAMS="--skip=vsl --skip=VSL" \
+        /bin/bash test_settings/scripts/test_runner.sh 2>&1 | tee -a /root/tier1.txt
+      args:
+        chdir: "{{ clone_dest }}/oadp-e2e-qe"
+        executable: /bin/bash
+      async: 90000
+      poll: 15
+  environment:
+    PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
+    GOROOT: "/usr/local/go"
+    GOBIN: "/usr/local/go/bin"
+    GOPATH: "{{ ansible_env.HOME }}/go"
+    KUBECONFIG: "{{ kubeconfig_path }}"
+    PROVIDER: "{{ e2e_provider }}"
+    REGION: "{{ e2e_region }}"
+    BACKUP_LOCATION: "{{ e2e_backup_location }}"
+    OADP_CREDS_FILE: "{{ aws_creds_file }}"
+    BUCKET: "{{ e2e_bucket }}"
+  when: oadp_run_e2e == true

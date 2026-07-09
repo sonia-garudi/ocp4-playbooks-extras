@@ -1,0 +1,5 @@
+---
+- name: Installation of the Openshift APIs for Data Protection(OADP) Operator
+  hosts: bastion
+  roles:
+  - ocp-oadp-operator

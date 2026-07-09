@@ -1,0 +1,46 @@
+---
+# ocp-oadp-operator vars
+
+oadp_enabled: false             # set to true to run the OADP operator playbook
+oadp_namespace: "openshift-adp" # namespace for the OADP operator
+oadp_channel: "main"            # subscription channel: stable, alpha, beta
+
+# GitHub credentials for cloning private repositories
+private_github_username: ""     # IBM GitHub username
+private_github_apikey: ""       # IBM GitHub API key with read access to the private repositories
+
+# Local path on the bastion where repositories will be cloned
+clone_dest: "/root/oadp"
+
+# Repository branch variables
+oadp_qe_automation_branch: "main"     # branch to clone from oadp-qe-automation
+oadp_e2e_qe_branch: "master"          # branch to clone from oadp-e2e-qe
+oadp_apps_deployer_branch: "master"   # branch to clone from oadp-apps-deployer
+
+# OADP install script parameters
+install_repository_type: ""     # stage / prestage
+install_ip_approval: ""         # Automatic / Manual
+install_stream: ""              # upstream / downstream
+install_oadp_version: ""        # OADP version to install, e.g. 1.4.0
+
+# LSO variables
+lso_index: ""                   # LSO catalog source index image; leave empty to use redhat-operators
+cluster_upi: true               # true for UPI cluster, false for IPI
+volume_path: ""                 # block device path, obtain via: ls /dev/disk/by-id/ on a worker node
+
+# ODF variables
+odf_index: ""                   # ODF catalog source index image; leave empty to use redhat-operators
+odf_channel: ""                 # ODF subscription channel, e.g. stable-4.16
+
+# e2e test variables
+oadp_run_e2e: false             # set to true to run Tier1 e2e tests after installation
+kubeconfig_path: "/root/openstack-upi/auth/kubeconfig"  # path to kubeconfig on the bastion
+aws_access_key_id: ""           # AWS access key ID (required when oadp_run_e2e is true)
+aws_secret_access_key: ""       # AWS secret access key (required when oadp_run_e2e is true)
+aws_creds_file: "/root/aws_creds"  # path where the AWS credentials file will be created
+oadp_golang_tarball_url: ""     # Go tarball URL for e2e tests; auto-detected from go.mod if not set
+ginkgo_version: ""              # Ginkgo version for e2e tests; auto-detected from go.mod if not set
+e2e_provider: "aws"             # cloud provider for e2e tests
+e2e_region: "us-east-1"         # cloud region for e2e tests
+e2e_backup_location: "aws"      # backup storage location for e2e tests
+e2e_bucket: "newocpbucket"      # S3 bucket name for e2e backup/restore tests

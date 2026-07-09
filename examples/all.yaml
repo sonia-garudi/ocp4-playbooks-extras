@@ -618,3 +618,29 @@ volume_path: "/dev/disk/by-id/......" #Get the volume path using "ls /dev/disk/b
 odf_index: "" #Example - quay.io/rhceph-dev/ocs-registry:4.16.3
 odf_channel:  #Define this to set subscription channel for ODF Operator
 quay_enable_global_secret: false 
+
+# ocp-oadp-operator vars
+oadp_enabled: false             # set to true to run the OADP operator playbook
+oadp_namespace: "openshift-adp" # namespace for the OADP operator
+oadp_channel: "main"            # subscription channel: stable, alpha, beta
+private_github_username: ""     # IBM GitHub username
+private_github_apikey: ""       # IBM GitHub API key with read access to the private repositories
+clone_dest: "/root/oadp"        # local path on the bastion where repositories will be cloned
+oadp_qe_automation_branch: "main"     # branch to clone from oadp-qe-automation
+oadp_e2e_qe_branch: "master"          # branch to clone from oadp-e2e-qe
+oadp_apps_deployer_branch: "master"   # branch to clone from oadp-apps-deployer
+install_repository_type: ""     # stage / prestage
+install_ip_approval: ""         # Automatic / Manual
+install_stream: ""              # upstream / downstream
+install_oadp_version: ""        # OADP version to install, e.g. 1.4.0
+oadp_run_e2e: false             # set to true to run Tier1 e2e tests after installation
+kubeconfig_path: "/root/openstack-upi/auth/kubeconfig"  # path to kubeconfig on the bastion
+aws_access_key_id: ""           # AWS access key ID (required when oadp_run_e2e is true)
+aws_secret_access_key: ""       # AWS secret access key (required when oadp_run_e2e is true)
+aws_creds_file: "/root/aws_creds"  # path where the AWS credentials file will be created
+oadp_golang_tarball_url: ""     # optional override; auto-detected from go.mod if not set
+ginkgo_version: ""              # optional override; auto-detected from go.mod if not set
+e2e_provider: "aws"             # cloud provider for e2e tests
+e2e_region: "us-east-1"         # cloud region for e2e tests
+e2e_backup_location: "aws"      # backup storage location for e2e tests
+e2e_bucket: "newocpbucket"      # S3 bucket name for e2e backup/restore tests
